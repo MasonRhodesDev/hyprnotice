@@ -9,6 +9,7 @@
 #include <hyprtoolkit/types/FontTypes.hpp>
 #include <hyprutils/memory/Atomic.hpp>
 
+#include "../core/Config.hpp"
 #include "../core/NotificationStore.hpp"
 #include "../core/Theme.hpp"
 #include "../dbus/NotificationsService.hpp"
@@ -20,34 +21,40 @@ namespace HN {
     using namespace Hyprtoolkit;
 
     namespace {
-        constexpr int32_t  kDefaultTimeoutMs = 5000;
-        constexpr Hyprutils::Math::Vector2D kPopupSize{360, 110};
-        constexpr int      kEdgeMargin       = 12;
+        // Build a fresh CWindowBuilder for a notification popup using the
+        // current hyprlang config snapshot. Centralised here so the ctor and
+        // rebuild() path don't drift.
+        SP<IWindow> makeWindow(uint32_t id) {
+            const auto& cfg = g_config.current();
+            return CWindowBuilder::begin()
+                ->type(HT_WINDOW_LAYER)
+                ->preferredSize({(double)cfg.width, (double)cfg.height})
+                ->appClass("hyprnotice")
+                ->appTitle(std::format("Notification {}", id))
+                ->layer(cfg.layer)
+                ->anchor(cfg.anchor)
+                ->marginTopLeft({(double)cfg.margin_left, (double)cfg.margin_top})
+                ->kbInteractive(LayerShell::KB_NONE)
+                ->commence();
+        }
     }
 
     CPopupWindow::CPopupWindow(SP<IBackend> backend, SP<SNotification> notification, CNotificationStore& store, CNotificationsService& notif)
         : m_backend(backend), m_notif(notification), m_store(store), m_notifService(notif), m_id(notification->id) {
 
-        m_window = CWindowBuilder::begin()
-                       ->type(HT_WINDOW_LAYER)
-                       ->preferredSize(kPopupSize)
-                       ->appClass("hyprnotice")
-                       ->appTitle(std::format("Notification {}", m_id))
-                       ->layer(LayerShell::LAYER_OVERLAY)
-                       ->anchor(LayerShell::ANCHOR_TOP | LayerShell::ANCHOR_RIGHT)
-                       ->marginTopLeft({kEdgeMargin, kEdgeMargin})
-                       ->kbInteractive(LayerShell::KB_NONE)
-                       ->commence();
-
+        m_window = makeWindow(m_id);
         buildContent();
-
         m_window->open();
 
-        const auto timeoutMs = m_notif->expireTimeoutMs > 0 ? m_notif->expireTimeoutMs : kDefaultTimeoutMs;
-        // 0 = persistent (spec); negative = server default. expireTimeoutMs == 0
-        // skips the auto-close so the popup stays until explicitly dismissed.
-        if (m_notif->expireTimeoutMs != 0)
-            scheduleAutoClose(timeoutMs);
+        // 0 = persistent (spec); negative = server default. We treat negative
+        // as "use config default_timeout", and zero as "never auto-close".
+        if (m_notif->expireTimeoutMs != 0) {
+            const auto ms = m_notif->expireTimeoutMs > 0
+                                ? m_notif->expireTimeoutMs
+                                : g_config.current().default_timeout;
+            if (ms > 0)
+                scheduleAutoClose(ms);
+        }
     }
 
     CPopupWindow::~CPopupWindow() {
@@ -118,8 +125,11 @@ namespace HN {
             for (size_t i = 0; i + 1 < m_notif->actions.size(); i += 2) {
                 const auto& key   = m_notif->actions[i];
                 const auto& label = m_notif->actions[i + 1];
-                if (key == "default")
-                    continue;
+                // Render every action including "default" — the latter
+                // typically carries a label like "Open" and shows up alongside
+                // any named actions. Body-click handling for "default" is
+                // tracked for v0.6 (hyprtoolkit's IElement doesn't expose a
+                // click-anywhere hook yet).
                 auto btn = CButtonBuilder::begin()
                                ->label(std::string{label})
                                ->onMainClick([id, key, &svc, &store](SP<CButtonElement>) {
@@ -154,23 +164,18 @@ namespace HN {
         // perf hit is irrelevant; correctness wins.
         if (m_window)
             m_window->close();
-        m_window = CWindowBuilder::begin()
-                       ->type(HT_WINDOW_LAYER)
-                       ->preferredSize(kPopupSize)
-                       ->appClass("hyprnotice")
-                       ->appTitle(std::format("Notification {}", m_id))
-                       ->layer(LayerShell::LAYER_OVERLAY)
-                       ->anchor(LayerShell::ANCHOR_TOP | LayerShell::ANCHOR_RIGHT)
-                       ->marginTopLeft({kEdgeMargin, kEdgeMargin})
-                       ->kbInteractive(LayerShell::KB_NONE)
-                       ->commence();
+        m_window = makeWindow(m_id);
         buildContent();
         m_window->open();
 
         if (m_autoCloseTimer)
             m_autoCloseTimer->cancel();
         if (m_notif->expireTimeoutMs != 0) {
-            scheduleAutoClose(m_notif->expireTimeoutMs > 0 ? m_notif->expireTimeoutMs : kDefaultTimeoutMs);
+            const auto ms = m_notif->expireTimeoutMs > 0
+                                ? m_notif->expireTimeoutMs
+                                : g_config.current().default_timeout;
+            if (ms > 0)
+                scheduleAutoClose(ms);
         }
     }
 

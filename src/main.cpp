@@ -10,6 +10,7 @@
 #include <hyprtoolkit/core/Backend.hpp>
 #include <sdbus-c++/sdbus-c++.h>
 
+#include "core/Config.hpp"
 #include "core/NotificationStore.hpp"
 #include "core/Theme.hpp"
 #include "dbus/InboxService.hpp"
@@ -69,7 +70,8 @@ int main(int argc, char** argv) {
 
     Debug::log(Debug::INFO, "hyprnotice {} starting", HYPRNOTICE_VERSION);
 
-    // Load theme before the backend so colors are correct on the first popup.
+    // Config first — Theme.reload() consults theme:colors_path.
+    HN::g_config.load();
     HN::g_theme.reload();
 
     g_backend = Hyprtoolkit::IBackend::create();
@@ -109,7 +111,8 @@ int main(int argc, char** argv) {
             std::chrono::milliseconds(500),
             [&armReloadCheck](Hyprutils::Memory::CAtomicSharedPointer<Hyprtoolkit::CTimer>, void*) {
                 if (g_reloadRequested.exchange(false, std::memory_order_relaxed)) {
-                    Debug::log(Debug::INFO, "SIGHUP: reloading theme");
+                    Debug::log(Debug::INFO, "SIGHUP: reloading config + theme");
+                    HN::g_config.load();
                     HN::g_theme.reload();
                 }
                 armReloadCheck();

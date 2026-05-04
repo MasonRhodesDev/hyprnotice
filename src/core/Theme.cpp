@@ -4,6 +4,7 @@
 #include <fstream>
 #include <regex>
 
+#include "Config.hpp"
 #include "../helpers/Log.hpp"
 
 namespace HN {
@@ -62,7 +63,10 @@ namespace HN {
     }
 
     bool CTheme::reload() {
-        const auto path = defaultPath();
+        // theme:colors_path overrides the default lmtt path (used for
+        // testing or non-lmtt setups). Empty falls back to the lmtt default.
+        const auto& override_ = g_config.current().colors_path;
+        const auto  path      = override_.empty() ? defaultPath() : std::filesystem::path{override_};
         if (path.empty()) {
             Debug::log(Debug::WARN, "theme: no path resolved (HOME/XDG_CONFIG_HOME unset)");
             return false;

@@ -15,7 +15,7 @@ Notification daemon for Hyprland with an action-retaining inbox.
 - Not a control center. The inbox is exposed via a CLI/IPC; an external picker (wofi/fuzzel) renders it.
 - Not feature-complete. See the roadmap below.
 
-## Status: v0.4.0 — lmtt theming, install script
+## Status: v0.5.0 — hyprlang config
 
 What works:
 - Full `org.freedesktop.Notifications` D-Bus server (Notify / CloseNotification / GetCapabilities / GetServerInformation)
@@ -26,15 +26,15 @@ What works:
 - **`org.hyprnotice.Inbox`** custom D-Bus interface for inbox introspection (List / Invoke / Dismiss / DismissAll + `Changed` signal)
 - **`hyprnotice-ctl`** CLI: `list`, `invoke <id> [action]`, `dismiss <id>`, `dismiss-all`
 - **lmtt theming** — popups read `~/.config/matugen/lmtt-colors.css` directly. SIGHUP triggers a re-read; an lmtt module sends the SIGHUP after every theme switch.
+- **hyprlang config** at `~/.config/hypr/hyprnotice.conf` for popup geometry (anchor, layer, width, height, margins) and timing (default_timeout). Reloaded on SIGHUP. See `assets/example.conf`.
+- **All actions render as buttons**, including the spec's `default` action — clicking the labeled button invokes its handler over D-Bus and dismisses.
 - **`install.sh`** — symlinks binaries into `/usr/local/bin`, drops a systemd user unit, disables predecessor mako D-Bus activation
 - sdbus-c++ event loop integrated into hyprtoolkit's via `addFd`
 
 What does NOT work yet:
 - No icon rendering (popups are text + buttons, no icon area)
-- No body-click → default action (only explicit buttons trigger actions)
-- No hyprlang config (layout, default-timeout, anchor, per-app rules)
-- No lmtt theming integration (uses hyprtoolkit's default palette)
-- No DND mode, no per-app rules, no urgency-based styling
+- No body-click → default action (hyprtoolkit's IElement doesn't expose click handlers on Rectangle/Layout; "default" actions still appear as a button so the action can be invoked)
+- No per-app rules, no DND mode, no urgency-based styling
 
 ## Roadmap
 
@@ -44,8 +44,9 @@ What does NOT work yet:
 | **v0.2** ✓ | Popup rendering via hyprtoolkit layer-shell window. Auto-close demotes to inbox. |
 | **v0.3** ✓ | Action buttons in popups. `hyprnotice-ctl` CLI for inbox listing/dismissal/action invocation. notify-send fix. |
 | **v0.4** ✓ | lmtt theming via direct lmtt-colors.css read + SIGHUP reload. Install script + systemd unit. mako migration. |
-| **v0.5** | Icons (path + freedesktop icon-theme lookup). Body-click default action. `hyprlang` config (layout/timeouts/per-app rules). DND mode. |
-| **v0.6** | Persistent history (write to `$XDG_RUNTIME_DIR` so survives daemon restart but not reboot). Per-monitor placement. |
+| **v0.5** ✓ | hyprlang config for popup geometry/timing. "default" action rendered as button. |
+| **v0.6** | Icons (path + freedesktop icon-theme lookup). DND mode. Per-app rules (special category). Body-click on popup background. |
+| **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. Persistent history across daemon restarts. |
 | **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. |
 
 ## Building
@@ -61,6 +62,20 @@ Dependencies (Fedora):
 ```sh
 sudo dnf install hyprutils-devel hyprlang-devel sdbus-cpp-devel cmake gcc-c++ pkgconf-pkg-config
 ```
+
+## Configuring
+
+Drop a config at `~/.config/hypr/hyprnotice.conf`. Every value has a baked-in default; the file is optional. See [`assets/example.conf`](assets/example.conf) for the full list of keys.
+
+```
+popup {
+    anchor = top right
+    width  = 360
+    default_timeout = 5000
+}
+```
+
+Reload with `pkill -HUP hyprnotice` (or just switch themes — lmtt's hyprnotice module sends the signal after rendering colors).
 
 ## Installing
 
