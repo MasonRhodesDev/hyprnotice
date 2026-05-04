@@ -5,3 +5,6 @@ compile_commands.json
 *.so
 result
 result-*
+
+# coredumps from in-tree daemon crashes
+core.*
