@@ -1,5 +1,6 @@
 #include "PopupManager.hpp"
 
+#include "../core/Config.hpp"
 #include "../core/NotificationStore.hpp"
 #include "../helpers/Log.hpp"
 
@@ -28,6 +29,20 @@ namespace HN {
             m_store.demote(n->id);
             return;
         }
+
+        // Per-app rules: matched against app_name. Mutates the notification
+        // in place (timeout) or short-circuits popup creation (skip_popup).
+        if (auto rule = g_config.matchRule(n->appName)) {
+            if (rule->timeout)
+                n->expireTimeoutMs = *rule->timeout;
+            if (rule->skipPopup && *rule->skipPopup) {
+                Debug::log(Debug::TRACE, "popup-mgr: rule for app=\"{}\" skips popup (id={})",
+                           n->appName, n->id);
+                m_store.demote(n->id);
+                return;
+            }
+        }
+
         Debug::log(Debug::TRACE, "popup-mgr: spawning popup for id={}", n->id);
         m_popups.emplace(n->id, makeUnique<CPopupWindow>(m_backend, n, m_store, m_notif));
     }

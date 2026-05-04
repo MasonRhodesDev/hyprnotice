@@ -1,11 +1,23 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include <hyprlang.hpp>
 
 namespace HN {
+
+    // Per-app override rule. Matched by case-insensitive substring against
+    // the notification's app_name. The first match wins; rule order is
+    // file order.
+    struct SAppRule {
+        std::string app;          // substring match against SNotification::appName
+        std::optional<int32_t> timeout;     // overrides expireTimeoutMs (-1 = unset)
+        std::optional<bool>    skipPopup;   // suppress popup entirely (still in inbox)
+    };
+
 
     // hyprlang-backed runtime config. Values cached in Config struct after
     // load() so popup builds don't pay parser overhead per frame. Config
@@ -31,6 +43,9 @@ namespace HN {
 
         // Theming.
         std::string colors_path = "";        // empty = use CTheme::defaultPath()
+
+        // Per-app overrides; populated from `rule { … }` blocks on every load().
+        std::vector<SAppRule> rules;
     };
 
     class CConfigManager {
@@ -44,6 +59,10 @@ namespace HN {
         // Read-only snapshot. Lambdas in popup builds capture by const-ref
         // to avoid stale copies after a reload.
         const SConfig& current() const { return m_current; }
+
+        // Apply per-app rules to a notification at accept time. Returns the
+        // first matching rule (by app substring), or nullopt.
+        std::optional<SAppRule> matchRule(const std::string& appName) const;
 
       private:
         Hyprlang::CConfig m_config;

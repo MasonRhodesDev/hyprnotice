@@ -81,9 +81,28 @@ namespace HN {
             return g_theme.get("on_surface", bg->getPalette()->m_colors.text);
         };
 
+        // Urgency-based border. Critical: solid red border. Normal: subtle
+        // outline_variant. Low: no border. Background stays the same — the
+        // border is what catches the eye.
+        const auto urg     = m_notif->urgency;
+        const auto borderC = [bg, urg] {
+            switch (urg) {
+                case eUrgency::CRITICAL:
+                    return g_theme.get("error", Hyprtoolkit::CHyprColor{1.F, 0.3F, 0.3F});
+                case eUrgency::LOW:
+                    return Hyprtoolkit::CHyprColor{0.F, 0.F, 0.F, 0.F};   // transparent
+                default:
+                    return g_theme.get("outline_variant",
+                                       bg->getPalette()->m_colors.alternateBase);
+            }
+        };
+        const int borderThickness = (urg == eUrgency::LOW) ? 0 : (urg == eUrgency::CRITICAL ? 2 : 1);
+
         m_window->m_rootElement->addChild(
             CRectangleBuilder::begin()
                 ->color(bgFn)
+                ->borderColor(borderC)
+                ->borderThickness(borderThickness)
                 ->rounding(10)
                 ->commence());
 

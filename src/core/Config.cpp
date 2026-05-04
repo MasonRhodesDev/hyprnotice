@@ -77,6 +77,14 @@ namespace HN {
 
         m_config.addConfigValue("theme:colors_path",     Hyprlang::STRING{""});
 
+        // `rule { app = slack; timeout = 0 }` blocks. Anonymous-keyed so the
+        // user can stack multiple of them.
+        m_config.addSpecialCategory("rule",
+            Hyprlang::SSpecialCategoryOptions{.key = nullptr, .anonymousKeyBased = true});
+        m_config.addSpecialConfigValue("rule", "app",        Hyprlang::STRING{""});
+        m_config.addSpecialConfigValue("rule", "timeout",    Hyprlang::INT{-1});
+        m_config.addSpecialConfigValue("rule", "skip_popup", Hyprlang::INT{0});
+
         m_config.commence();
     }
 
@@ -115,6 +123,51 @@ namespace HN {
         m_current.default_timeout = static_cast<int32_t>(getInt("popup:default_timeout"));
         m_current.max_visible     = static_cast<int32_t>(getInt("popup:max_visible"));
         m_current.colors_path     = getStr("theme:colors_path");
+
+        m_current.rules.clear();
+        const auto keys = m_config.listKeysForSpecialCategory("rule");
+        for (const auto& key : keys) {
+            const auto getRuleStr = [&](const char* k) -> std::string {
+                const auto v = std::any_cast<Hyprlang::STRING>(
+                    m_config.getSpecialConfigValue("rule", k, key.c_str()));
+                return v ? std::string{v} : std::string{};
+            };
+            const auto getRuleInt = [&](const char* k) {
+                return std::any_cast<Hyprlang::INT>(
+                    m_config.getSpecialConfigValue("rule", k, key.c_str()));
+            };
+
+            SAppRule r;
+            r.app = getRuleStr("app");
+            if (r.app.empty())
+                continue;
+            const auto t = getRuleInt("timeout");
+            if (t != -1)
+                r.timeout = static_cast<int32_t>(t);
+            const auto s = getRuleInt("skip_popup");
+            if (s != 0)
+                r.skipPopup = (s != 0);
+            m_current.rules.push_back(std::move(r));
+        }
+        Debug::log(Debug::INFO, "config: cached {} rule(s)", m_current.rules.size());
+    }
+
+    std::optional<SAppRule> CConfigManager::matchRule(const std::string& appName) const {
+        if (appName.empty())
+            return std::nullopt;
+        // Case-insensitive substring match. Returns the first hit (definition
+        // order) so users can put a more specific rule above a generic one.
+        std::string a;
+        a.reserve(appName.size());
+        for (auto c : appName) a.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+        for (const auto& r : m_current.rules) {
+            std::string b;
+            b.reserve(r.app.size());
+            for (auto c : r.app) b.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+            if (a.find(b) != std::string::npos)
+                return r;
+        }
+        return std::nullopt;
     }
 
 }

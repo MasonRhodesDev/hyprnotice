@@ -60,11 +60,43 @@ namespace HN {
             .withArguments(id, key);
     }
 
+    namespace {
+        // Try-extract a Variant value as type T; returns nullopt if either
+        // the variant is the wrong type or get<>() throws.
+        template <typename T>
+        std::optional<T> tryGet(const sdbus::Variant& v) {
+            try {
+                return v.get<T>();
+            } catch (...) {
+                return std::nullopt;
+            }
+        }
+
+        SNotification::SImageData parseImageData(const sdbus::Variant& v) {
+            // Spec: hint value is a struct (iiibii ay) — width, height,
+            // rowstride, has_alpha, bits_per_sample, channels, data.
+            using Tuple = sdbus::Struct<int32_t, int32_t, int32_t, bool, int32_t, int32_t,
+                                        std::vector<uint8_t>>;
+            auto t = tryGet<Tuple>(v);
+            if (!t)
+                return {};
+            return {
+                .width         = std::get<0>(*t),
+                .height        = std::get<1>(*t),
+                .rowstride     = std::get<2>(*t),
+                .hasAlpha      = std::get<3>(*t),
+                .bitsPerSample = std::get<4>(*t),
+                .channels      = std::get<5>(*t),
+                .data          = std::move(std::get<6>(*t)),
+            };
+        }
+    }
+
     uint32_t CNotificationsService::onNotify(const std::string& appName, uint32_t replacesId,
                                              const std::string& appIcon, const std::string& summary,
                                              const std::string& body,
                                              const std::vector<std::string>& actions,
-                                             const std::map<std::string, sdbus::Variant>& /*hints*/,
+                                             const std::map<std::string, sdbus::Variant>& hints,
                                              int32_t expireTimeoutMs, sdbus::ObjectPath /*sender*/) {
         SNotification n{
             .replaceId       = replacesId,
@@ -76,6 +108,20 @@ namespace HN {
             .expireTimeoutMs = expireTimeoutMs,
             .received        = std::chrono::steady_clock::now(),
         };
+
+        // Hints we honor. Spec lists more (sound, x/y, transient, …); add as
+        // they become useful.
+        if (auto it = hints.find("urgency"); it != hints.end()) {
+            if (auto u = tryGet<uint8_t>(it->second))
+                n.urgency = (*u >= 2) ? eUrgency::CRITICAL :
+                            (*u == 1) ? eUrgency::NORMAL : eUrgency::LOW;
+        }
+        // Modern apps use "image-data"; legacy apps "icon_data". Same format.
+        if (auto it = hints.find("image-data"); it != hints.end())
+            n.imageData = parseImageData(it->second);
+        else if (auto it2 = hints.find("icon_data"); it2 != hints.end())
+            n.imageData = parseImageData(it2->second);
+
         return m_store.accept(std::move(n));
     }
 
