@@ -10,6 +10,7 @@
 #include <hyprutils/memory/Atomic.hpp>
 
 #include "../core/NotificationStore.hpp"
+#include "../core/Theme.hpp"
 #include "../dbus/NotificationsService.hpp"
 #include "../helpers/Log.hpp"
 #include "LayerShell.hpp"
@@ -57,10 +58,21 @@ namespace HN {
     }
 
     void CPopupWindow::buildContent() {
+        // Theme colors: prefer the matugen-generated lmtt palette, fall back
+        // to hyprtoolkit's built-in palette so the popup is still visible
+        // before lmtt has run for the first time. Lambdas capture nothing
+        // expensive — they're called once per element rebuild.
         auto bg = m_backend;
+        const auto bgFn = [bg] {
+            return g_theme.get("surface_container", bg->getPalette()->m_colors.background);
+        };
+        const auto textFn = [bg] {
+            return g_theme.get("on_surface", bg->getPalette()->m_colors.text);
+        };
+
         m_window->m_rootElement->addChild(
             CRectangleBuilder::begin()
-                ->color([bg] { return bg->getPalette()->m_colors.background; })
+                ->color(bgFn)
                 ->rounding(10)
                 ->commence());
 
@@ -75,7 +87,7 @@ namespace HN {
                                             m_notif->appName.empty() ? "notification" : m_notif->appName,
                                             m_notif->summary))
                          ->fontSize(CFontSize{CFontSize::HT_FONT_H3})
-                         ->color([bg] { return bg->getPalette()->m_colors.text; })
+                         ->color(textFn)
                          ->commence();
         col->addChild(title);
 
@@ -83,7 +95,7 @@ namespace HN {
             auto body = CTextBuilder::begin()
                             ->text(std::string{m_notif->body})
                             ->fontSize(CFontSize{CFontSize::HT_FONT_TEXT})
-                            ->color([bg] { return bg->getPalette()->m_colors.text; })
+                            ->color(textFn)
                             ->noEllipsize(false)
                             ->commence();
             col->addChild(body);

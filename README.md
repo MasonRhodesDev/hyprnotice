@@ -15,7 +15,7 @@ Notification daemon for Hyprland with an action-retaining inbox.
 - Not a control center. The inbox is exposed via a CLI/IPC; an external picker (wofi/fuzzel) renders it.
 - Not feature-complete. See the roadmap below.
 
-## Status: v0.3.0 — action retention, inbox, CLI
+## Status: v0.4.0 — lmtt theming, install script
 
 What works:
 - Full `org.freedesktop.Notifications` D-Bus server (Notify / CloseNotification / GetCapabilities / GetServerInformation)
@@ -25,6 +25,8 @@ What works:
 - **Action retention via inbox state** — popup auto-close demotes (not closes), so the source app's action handlers stay alive. You can invoke a Slack notification's "Reply" from the inbox an hour after the popup vanished.
 - **`org.hyprnotice.Inbox`** custom D-Bus interface for inbox introspection (List / Invoke / Dismiss / DismissAll + `Changed` signal)
 - **`hyprnotice-ctl`** CLI: `list`, `invoke <id> [action]`, `dismiss <id>`, `dismiss-all`
+- **lmtt theming** — popups read `~/.config/matugen/lmtt-colors.css` directly. SIGHUP triggers a re-read; an lmtt module sends the SIGHUP after every theme switch.
+- **`install.sh`** — symlinks binaries into `/usr/local/bin`, drops a systemd user unit, disables predecessor mako D-Bus activation
 - sdbus-c++ event loop integrated into hyprtoolkit's via `addFd`
 
 What does NOT work yet:
@@ -41,8 +43,9 @@ What does NOT work yet:
 | **v0.1** ✓ | D-Bus skeleton, store, build/lint/test scaffolding |
 | **v0.2** ✓ | Popup rendering via hyprtoolkit layer-shell window. Auto-close demotes to inbox. |
 | **v0.3** ✓ | Action buttons in popups. `hyprnotice-ctl` CLI for inbox listing/dismissal/action invocation. notify-send fix. |
-| **v0.4** | Icons (path + freedesktop icon-theme lookup). Body-click default action. `hyprlang` config (layout/timeouts/per-app rules). lmtt module + matugen template. |
-| **v0.5** | Persistent history (write to `$XDG_RUNTIME_DIR` so survives daemon restart but not reboot). DND mode. Per-monitor placement. |
+| **v0.4** ✓ | lmtt theming via direct lmtt-colors.css read + SIGHUP reload. Install script + systemd unit. mako migration. |
+| **v0.5** | Icons (path + freedesktop icon-theme lookup). Body-click default action. `hyprlang` config (layout/timeouts/per-app rules). DND mode. |
+| **v0.6** | Persistent history (write to `$XDG_RUNTIME_DIR` so survives daemon restart but not reboot). Per-monitor placement. |
 | **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. |
 
 ## Building
@@ -59,14 +62,23 @@ Dependencies (Fedora):
 sudo dnf install hyprutils-devel hyprlang-devel sdbus-cpp-devel cmake gcc-c++ pkgconf-pkg-config
 ```
 
-## Running
-
-The daemon claims `org.freedesktop.Notifications` on the session bus, so any other notification daemon (mako, dunst, swaync) **must be stopped first**:
+## Installing
 
 ```sh
-systemctl --user stop mako.service swaync.service 2>/dev/null
-./build/hyprnotice --verbose
+cmake -B build && cmake --build build -j$(nproc)
+./install.sh   # symlinks into /usr/local/bin, drops systemd unit, disables mako
 ```
+
+## Running
+
+The installer enables `hyprnotice.service` on `graphical-session.target` so the daemon comes up at login. Manual start:
+
+```sh
+systemctl --user start hyprnotice.service
+journalctl --user -u hyprnotice.service -f
+```
+
+`hyprnotice` claims `org.freedesktop.Notifications` on the session bus, so any other notification daemon (mako, dunst, swaync) must be stopped first. The installer disables mako's D-Bus auto-activation; for swaync use `systemctl --user disable --now swaync.service`.
 
 Test from another terminal:
 

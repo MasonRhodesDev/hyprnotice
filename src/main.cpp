@@ -1,11 +1,17 @@
+#include <atomic>
+#include <chrono>
 #include <csignal>
 #include <print>
 #include <string_view>
+
+#include <hyprtoolkit/core/Timer.hpp>
+#include <hyprutils/memory/Atomic.hpp>
 
 #include <hyprtoolkit/core/Backend.hpp>
 #include <sdbus-c++/sdbus-c++.h>
 
 #include "core/NotificationStore.hpp"
+#include "core/Theme.hpp"
 #include "dbus/InboxService.hpp"
 #include "dbus/NotificationsService.hpp"
 #include "helpers/Log.hpp"
@@ -14,8 +20,15 @@
 
 namespace {
     SP<Hyprtoolkit::IBackend> g_backend;
+    std::atomic<bool>         g_reloadRequested{false};
 
-    void onSignal(int) {
+    void onSignal(int sig) {
+        if (sig == SIGHUP) {
+            // Defer the reload to the main loop — signal context is unsafe
+            // for filesystem and hyprtoolkit calls.
+            g_reloadRequested.store(true, std::memory_order_relaxed);
+            return;
+        }
         if (g_backend)
             g_backend->destroy();
     }
@@ -56,6 +69,9 @@ int main(int argc, char** argv) {
 
     Debug::log(Debug::INFO, "hyprnotice {} starting", HYPRNOTICE_VERSION);
 
+    // Load theme before the backend so colors are correct on the first popup.
+    HN::g_theme.reload();
+
     g_backend = Hyprtoolkit::IBackend::create();
     if (!g_backend) {
         std::println(stderr, "failed to create hyprtoolkit backend (Wayland not available?)");
@@ -80,6 +96,27 @@ int main(int argc, char** argv) {
 
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
+    std::signal(SIGHUP, onSignal);
+
+    // Periodic idle check for SIGHUP-triggered theme reloads. hyprtoolkit's
+    // addTimer is one-shot, so the callback re-arms itself. Cheap (only
+    // re-reads the file when the flag is set). Existing popup color
+    // callbacks query g_theme on every paint, so the new palette takes
+    // effect on the next frame.
+    std::function<void()> armReloadCheck;
+    armReloadCheck = [&armReloadCheck] {
+        g_backend->addTimer(
+            std::chrono::milliseconds(500),
+            [&armReloadCheck](Hyprutils::Memory::CAtomicSharedPointer<Hyprtoolkit::CTimer>, void*) {
+                if (g_reloadRequested.exchange(false, std::memory_order_relaxed)) {
+                    Debug::log(Debug::INFO, "SIGHUP: reloading theme");
+                    HN::g_theme.reload();
+                }
+                armReloadCheck();
+            },
+            nullptr);
+    };
+    armReloadCheck();
 
     g_backend->enterLoop();
 
