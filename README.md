@@ -55,7 +55,6 @@ What does NOT work yet:
 | **v0.7** ✓ | Urgency-based styling. Per-app rules (skip_popup, timeout overrides). |
 | **v1.0** ✓ | Persistent inbox across daemon restart. image-data raw→PNG encoding via vendored stb_image_write. |
 | **future** | Body-click default action (hyprtoolkit upstream). Inline replies (text-input element upstream). Sound (libcanberra). Grouping. |
-| **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. |
 
 ## Building
 
