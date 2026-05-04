@@ -1,0 +1,14 @@
+[Unit]
+Description=hyprnotice notification daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.Notifications
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/hyprnotice
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
