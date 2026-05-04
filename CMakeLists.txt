@@ -41,6 +41,10 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET
   hyprutils>=0.11.0
   hyprlang>=0.6.0
+  hyprtoolkit
+  hyprgraphics
+  pixman-1
+  libdrm
   sdbus-c++>=2.0.0)
 
 file(GLOB_RECURSE SRCFILES CONFIGURE_DEPENDS "src/*.cpp")

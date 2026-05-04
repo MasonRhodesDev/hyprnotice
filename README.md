@@ -15,31 +15,36 @@ Notification daemon for Hyprland with an action-retaining inbox.
 - Not a control center. The inbox is exposed via a CLI/IPC; an external picker (wofi/fuzzel) renders it.
 - Not feature-complete. See the roadmap below.
 
-## Status: v0.1.0 — D-Bus skeleton
+## Status: v0.2.0 — popups render
 
 What works:
 - D-Bus server registers `org.freedesktop.Notifications` on the user session bus
 - Implements `Notify`, `CloseNotification`, `GetCapabilities`, `GetServerInformation`
 - Notifications stored in `CNotificationStore`; emits `NotificationClosed` on close
+- **Layer-shell popups rendered via hyprtoolkit** (top-right, OVERLAY layer, no kbd focus)
+- Popup auto-closes via configurable timeout (default 5s, `expire_timeout=0` keeps it persistent)
+- **Auto-close demotes to INBOX, doesn't emit NotificationClosed** — sender's action handlers stay alive for the inbox UI to invoke later
+- sdbus-c++ event loop integrated into hyprtoolkit's via `addFd`
 - `--version`, `--help`, `--verbose`, `--quiet` flags
 
 What does NOT work yet:
-- No popup rendering (you can `notify-send` and inspect via `dbus-monitor`, but nothing shows on screen)
-- No inbox picker / CLI client
-- No hyprlang config
-- No lmtt theming integration
-- No `ActionInvoked` wiring (the signal exists; nothing emits it yet)
+- No icon rendering (popups are text-only summary + body)
+- No action buttons in popups
+- No inbox picker / `hyprnotice-ctl` CLI
+- No hyprlang config (layout, default-timeout, anchor, per-app rules)
+- No lmtt theming integration (uses hyprtoolkit's default palette)
+- No `ActionInvoked` wiring beyond the signal definition
 
 ## Roadmap
 
 | Milestone | Scope |
 |---|---|
 | **v0.1** ✓ | D-Bus skeleton, store, build/lint/test scaffolding |
-| **v0.2** | Popup rendering via hyprtoolkit layer-shell window. Per-monitor placement. Urgency-based styling. |
-| **v0.3** | `hyprnotice-ctl` CLI for inbox listing/dismissal. Wire `ActionInvoked` from CLI invocation. |
+| **v0.2** ✓ | Popup rendering via hyprtoolkit layer-shell window. Auto-close demotes to inbox. |
+| **v0.3** | Action buttons in popups. Icons. `hyprnotice-ctl` CLI for inbox listing/dismissal/action invocation. |
 | **v0.4** | `hyprlang` config for layout/timeouts/per-app rules. lmtt module + matugen template. |
-| **v0.5** | Persistent history (write to `$XDG_RUNTIME_DIR` so survives daemon restart but not reboot). DND mode. |
-| **v1.0** | Feature-parity with swaync inbox: action buttons, replies, grouping, sound. |
+| **v0.5** | Persistent history (write to `$XDG_RUNTIME_DIR` so survives daemon restart but not reboot). DND mode. Per-monitor placement. |
+| **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. |
 
 ## Building
 
