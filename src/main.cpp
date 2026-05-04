@@ -83,6 +83,7 @@ int main(int argc, char** argv) {
     auto bus = sdbus::createSessionBusConnection();
 
     HN::CNotificationStore     store;
+    store.loadFromDisk();
     HN::CNotificationsService  service(*bus, store);
     HN::CInboxService          inbox(*bus, store, service);
     HN::CPopupManager          popups(g_backend, store, service);
@@ -121,8 +122,25 @@ int main(int argc, char** argv) {
     };
     armReloadCheck();
 
+    // Persist the inbox every 10s so a crash loses at most that window of
+    // notifications. saveToDisk() is cheap (in the dozens-of-entries domain).
+    std::function<void()> armPersist;
+    armPersist = [&armPersist, &store] {
+        g_backend->addTimer(
+            std::chrono::seconds(10),
+            [&armPersist, &store](Hyprutils::Memory::CAtomicSharedPointer<Hyprtoolkit::CTimer>, void*) {
+                store.saveToDisk();
+                armPersist();
+            },
+            nullptr);
+    };
+    armPersist();
+
     g_backend->enterLoop();
 
+    // Final flush before tearing down — captures any notifications that came
+    // in after the last periodic save fired.
+    store.saveToDisk();
     Debug::log(Debug::INFO, "hyprnotice exiting");
     return 0;
 }

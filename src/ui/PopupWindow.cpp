@@ -14,6 +14,7 @@
 #include <hyprutils/memory/Atomic.hpp>
 
 #include "../core/Config.hpp"
+#include "../core/ImageEncoding.hpp"
 #include "../core/NotificationStore.hpp"
 #include "../core/Theme.hpp"
 #include "../dbus/NotificationsService.hpp"
@@ -114,13 +115,29 @@ namespace HN {
                        ->commence();
         m_window->m_rootElement->addChild(row);
 
-        if (!m_notif->appIcon.empty()) {
-            constexpr Hyprutils::Math::Vector2D kIconSize{48, 48};
+        // Three icon resolution paths in priority order:
+        //   1. Inline image-data hint (Discord/Telegram-style avatars). We
+        //      encode the raw pixel bytes to PNG via vendored stb_image_write
+        //      since hyprtoolkit's image pipeline expects compressed bytes.
+        //   2. app_icon as absolute path (or file:// URI).
+        //   3. app_icon as freedesktop icon name (resolved via hyprtoolkit's
+        //      systemIcons factory).
+        constexpr Hyprutils::Math::Vector2D kIconSize{48, 48};
+        SP<CImageElement> img;
+
+        if (!m_notif->imageData.empty()) {
+            auto png = encodeImageDataToPng(m_notif->imageData);
+            if (!png.empty()) {
+                img = CImageBuilder::begin()
+                          ->data(std::move(png))
+                          ->size({CDynamicSize::HT_SIZE_ABSOLUTE, CDynamicSize::HT_SIZE_ABSOLUTE, kIconSize})
+                          ->rounding(6)
+                          ->commence();
+            }
+        }
+
+        if (!img && !m_notif->appIcon.empty()) {
             const auto& icon = m_notif->appIcon;
-            // Heuristic: leading "/" or "file://" → absolute path; otherwise
-            // freedesktop icon name (resolved via hyprtoolkit's systemIcons
-            // factory which walks the user's icon-theme search path).
-            SP<CImageElement> img;
             if (icon.starts_with("/") || icon.starts_with("file://")) {
                 std::string path = icon.starts_with("file://") ? icon.substr(7) : icon;
                 if (std::filesystem::exists(path)) {
@@ -136,9 +153,10 @@ namespace HN {
                           ->size({CDynamicSize::HT_SIZE_ABSOLUTE, CDynamicSize::HT_SIZE_ABSOLUTE, kIconSize})
                           ->commence();
             }
-            if (img)
-                row->addChild(img);
         }
+
+        if (img)
+            row->addChild(img);
 
         auto col = CColumnLayoutBuilder::begin()
                        ->gap(6)

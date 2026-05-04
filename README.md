@@ -15,7 +15,7 @@ Notification daemon for Hyprland with an action-retaining inbox.
 - Not a control center. The inbox is exposed via a CLI/IPC; an external picker (wofi/fuzzel) renders it.
 - Not feature-complete. See the roadmap below.
 
-## Status: v0.7.0 — urgency styling, per-app rules
+## Status: v1.0.0 — persistent inbox, image-data rendering
 
 What works:
 - Full `org.freedesktop.Notifications` D-Bus server (Notify / CloseNotification / GetCapabilities / GetServerInformation)
@@ -32,12 +32,15 @@ What works:
 - **Do-not-disturb mode**: `hyprnotice-ctl mode dnd|none|toggle`. Notifications still arrive and appear in `hyprnotice-ctl list`/the inbox picker — only the popup is suppressed. Same D-Bus methods on `org.hyprnotice.Inbox` (`SetMode`, `GetMode`).
 - **Urgency-based styling**: critical (urgency=2) gets a 2px red border + non-expiring; normal (urgency=1) gets a subtle outline; low (urgency=0) gets none. Colors from the lmtt palette (`error`, `outline_variant`).
 - **Per-app rules** in `hyprnotice.conf`: stack `rule { app = …; timeout = …; skip_popup = … }` blocks for noisy/important apps. First substring match wins.
+- **Persistent inbox** across daemon restart: `CNotificationStore` writes to `$XDG_RUNTIME_DIR/hyprnotice/store.json` every 10s + on graceful shutdown, replays the inbox on next start. Survives `systemctl restart` but not a full reboot (XDG_RUNTIME_DIR is wiped at logout — the right default for "old notifications I missed should disappear when I log back in").
+- **`image-data` hint rendering**: raw ARGB/RGB pixel bytes from Discord/Telegram/etc. are encoded to PNG in-process via vendored [stb_image_write](https://github.com/nothings/stb) (single-header, public domain — no new system deps) and handed to hyprtoolkit's `CImageBuilder::data()`. Falls back to `app_icon` if encoding fails.
 - **`install.sh`** — symlinks binaries into `/usr/local/bin`, drops a systemd user unit, disables predecessor mako D-Bus activation
 - sdbus-c++ event loop integrated into hyprtoolkit's via `addFd`
 
 What does NOT work yet:
-- No body-click → default action (hyprtoolkit's IElement doesn't expose click handlers on Rectangle/Layout; "default" actions still appear as a button so the action can be invoked)
-- `icon_data` hint is parsed but not rendered — hyprtoolkit's image pipeline expects encoded bytes (PNG/JPEG/SVG) and the spec sends raw ARGB pixels. Apps that also send `app_icon` will use that fallback. Tracked for v1.0 (would require linking libpng or stb_image_write to encode raw → PNG).
+- No body-click → default action (hyprtoolkit's IElement doesn't expose click handlers on Rectangle/Layout; "default" actions still appear as a button so the action can be invoked from the popup, and via `hyprnotice-ctl invoke <id>` from the inbox). Would require an upstream hyprtoolkit feature.
+- No inline replies (no text-input element in hyprtoolkit yet). Reply-style notifications still render their reply *button* normally — clicking it fires `ActionInvoked` so the source app can pop its own reply UI.
+- No sound playback (the spec's `sound-name` / `sound-file` hints are ignored). Most modern apps play their own notification sound; adding this would require linking libcanberra or shelling out to `paplay`. Easy to add when there's a real need.
 
 ## Roadmap
 
@@ -49,8 +52,9 @@ What does NOT work yet:
 | **v0.4** ✓ | lmtt theming via direct lmtt-colors.css read + SIGHUP reload. Install script + systemd unit. mako migration. |
 | **v0.5** ✓ | hyprlang config for popup geometry/timing. "default" action rendered as button. |
 | **v0.6** ✓ | Icons (path + freedesktop icon-theme lookup). DND mode. |
-| **v0.7** ✓ | Urgency-based styling. Per-app rules (skip_popup, timeout overrides). icon_data parsed (rendering deferred). |
-| **v1.0** | Body-click default action. icon_data raw→PNG encoding. Inline replies. Grouping. Sound. Persistent history across daemon restarts. |
+| **v0.7** ✓ | Urgency-based styling. Per-app rules (skip_popup, timeout overrides). |
+| **v1.0** ✓ | Persistent inbox across daemon restart. image-data raw→PNG encoding via vendored stb_image_write. |
+| **future** | Body-click default action (hyprtoolkit upstream). Inline replies (text-input element upstream). Sound (libcanberra). Grouping. |
 | **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. |
 
 ## Building

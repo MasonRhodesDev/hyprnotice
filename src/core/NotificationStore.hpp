@@ -21,6 +21,15 @@ namespace HN {
     //      so that the sender keeps its handle.
     class CNotificationStore {
       public:
+        // Persistence: write/read JSON snapshot to $XDG_RUNTIME_DIR/hyprnotice/store.json
+        // (or $TMPDIR fallback). Called on graceful shutdown and at startup
+        // so notifications survive a `systemctl restart hyprnotice`. We
+        // intentionally use XDG_RUNTIME_DIR rather than XDG_DATA_HOME so the
+        // store does NOT survive a full reboot — old notifications losing
+        // relevance after a logout is the right default.
+        void saveToDisk() const;
+        void loadFromDisk();
+
         // Insert or replace. Returns the assigned id.
         uint32_t accept(SNotification&& n);
 
