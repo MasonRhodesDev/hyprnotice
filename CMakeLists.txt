@@ -51,7 +51,15 @@ file(GLOB_RECURSE SRCFILES CONFIGURE_DEPENDS "src/*.cpp")
 add_executable(hyprnotice ${SRCFILES})
 target_link_libraries(hyprnotice PRIVATE rt Threads::Threads PkgConfig::deps)
 
-install(TARGETS hyprnotice)
+# CLI client lives in cli/ so its sources don't get pulled into the daemon
+# binary's GLOB. Only links what it actually uses (sdbus-c++).
+file(GLOB CLI_SRCFILES CONFIGURE_DEPENDS "cli/*.cpp")
+add_executable(hyprnotice-ctl ${CLI_SRCFILES})
+pkg_check_modules(cli_deps REQUIRED IMPORTED_TARGET sdbus-c++>=2.0.0)
+target_link_libraries(hyprnotice-ctl PRIVATE PkgConfig::cli_deps)
+target_compile_features(hyprnotice-ctl PRIVATE cxx_std_23)
+
+install(TARGETS hyprnotice hyprnotice-ctl)
 install(FILES ${CMAKE_BINARY_DIR}/systemd/hyprnotice.service
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/systemd/user
   OPTIONAL)

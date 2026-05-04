@@ -1,13 +1,16 @@
 #include "PopupWindow.hpp"
 
 #include <hyprtoolkit/core/Timer.hpp>
-#include <hyprtoolkit/element/Rectangle.hpp>
+#include <hyprtoolkit/element/Button.hpp>
 #include <hyprtoolkit/element/ColumnLayout.hpp>
+#include <hyprtoolkit/element/Rectangle.hpp>
+#include <hyprtoolkit/element/RowLayout.hpp>
 #include <hyprtoolkit/element/Text.hpp>
 #include <hyprtoolkit/types/FontTypes.hpp>
 #include <hyprutils/memory/Atomic.hpp>
 
 #include "../core/NotificationStore.hpp"
+#include "../dbus/NotificationsService.hpp"
 #include "../helpers/Log.hpp"
 #include "LayerShell.hpp"
 
@@ -21,8 +24,8 @@ namespace HN {
         constexpr int      kEdgeMargin       = 12;
     }
 
-    CPopupWindow::CPopupWindow(SP<IBackend> backend, SP<SNotification> notification, CNotificationStore& store)
-        : m_backend(backend), m_notif(notification), m_store(store), m_id(notification->id) {
+    CPopupWindow::CPopupWindow(SP<IBackend> backend, SP<SNotification> notification, CNotificationStore& store, CNotificationsService& notif)
+        : m_backend(backend), m_notif(notification), m_store(store), m_notifService(notif), m_id(notification->id) {
 
         m_window = CWindowBuilder::begin()
                        ->type(HT_WINDOW_LAYER)
@@ -84,6 +87,38 @@ namespace HN {
                             ->noEllipsize(false)
                             ->commence();
             col->addChild(body);
+        }
+
+        // Action buttons. notification.actions is alternating [key, label, ...].
+        // The "default" action key is the click-on-the-popup action and gets
+        // no button — it's invoked by clicking the popup body itself (not yet
+        // wired; tracked for v0.4). All other named actions become buttons.
+        if (m_notif->actions.size() >= 2) {
+            auto row = CRowLayoutBuilder::begin()
+                           ->gap(6)
+                           ->size({CDynamicSize::HT_SIZE_PERCENT, CDynamicSize::HT_SIZE_AUTO, {1.F, 1.F}})
+                           ->commence();
+
+            const auto id     = m_id;
+            auto&      store  = m_store;
+            auto&      svc    = m_notifService;
+
+            for (size_t i = 0; i + 1 < m_notif->actions.size(); i += 2) {
+                const auto& key   = m_notif->actions[i];
+                const auto& label = m_notif->actions[i + 1];
+                if (key == "default")
+                    continue;
+                auto btn = CButtonBuilder::begin()
+                               ->label(std::string{label})
+                               ->onMainClick([id, key, &svc, &store](SP<CButtonElement>) {
+                                   svc.emitActionInvoked(id, key);
+                                   store.close(id, SNotification::eCloseReason::DISMISSED);
+                               })
+                               ->size({CDynamicSize::HT_SIZE_AUTO, CDynamicSize::HT_SIZE_AUTO, {1, 1}})
+                               ->commence();
+                row->addChild(btn);
+            }
+            col->addChild(row);
         }
     }
 

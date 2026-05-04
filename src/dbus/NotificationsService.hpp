@@ -25,8 +25,12 @@ namespace HN {
         ~CNotificationsService();
 
         // Emit ActionInvoked(id, action_key) on the bus. Called by the UI
-        // layer when a user clicks an action button.
+        // layer when a user clicks an action button, and by the inbox CLI
+        // (via CInboxService::Invoke).
         void emitActionInvoked(uint32_t id, const std::string& actionKey);
+
+        // Accessor for inbox/popup layers to look up sender info etc.
+        CNotificationStore& store() { return m_store; }
 
       private:
         // ===== D-Bus method handlers =====
@@ -43,8 +47,13 @@ namespace HN {
         // GetCapabilities() -> as
         std::vector<std::string> onGetCapabilities();
 
-        // GetServerInformation() -> (ssss)
-        sdbus::Struct<std::string, std::string, std::string, std::string> onGetServerInformation();
+        // GetServerInformation() -> ssss (four separate strings, NOT a struct).
+        // The spec lists name/vendor/version/spec_version as four return
+        // values; libnotify parses them with `g_variant_get(reply, "(ssss)", ...)`
+        // which is the auto-tuple wrapping D-Bus applies to *every* method
+        // reply. If we return sdbus::Struct we'd wrap a struct *inside* that
+        // tuple → "((ssss))" on the wire → libnotify sees null fields.
+        std::tuple<std::string, std::string, std::string, std::string> onGetServerInformation();
 
         // ===== signal wiring =====
         sdbus::IConnection&                m_bus;

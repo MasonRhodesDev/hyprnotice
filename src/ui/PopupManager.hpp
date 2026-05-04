@@ -10,6 +10,7 @@
 namespace HN {
 
     class CNotificationStore;
+    class CNotificationsService;
 
     // Bridges CNotificationStore signals → on-screen layer-shell popups. One
     // CPopupWindow per VISIBLE notification; INBOX/CLOSED entries don't have
@@ -17,7 +18,7 @@ namespace HN {
     // its full lifetime.
     class CPopupManager {
       public:
-        CPopupManager(SP<Hyprtoolkit::IBackend> backend, CNotificationStore& store);
+        CPopupManager(SP<Hyprtoolkit::IBackend> backend, CNotificationStore& store, CNotificationsService& notif);
         ~CPopupManager();
 
       private:
@@ -27,6 +28,7 @@ namespace HN {
 
         SP<Hyprtoolkit::IBackend>                                  m_backend;
         CNotificationStore&                                        m_store;
+        CNotificationsService&                                     m_notif;
         std::unordered_map<uint32_t, UP<CPopupWindow>>             m_popups;
 
         Hyprutils::Signal::CHyprSignalListener                     m_addedListener;

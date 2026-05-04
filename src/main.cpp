@@ -6,6 +6,7 @@
 #include <sdbus-c++/sdbus-c++.h>
 
 #include "core/NotificationStore.hpp"
+#include "dbus/InboxService.hpp"
 #include "dbus/NotificationsService.hpp"
 #include "helpers/Log.hpp"
 #include "helpers/Memory.hpp"
@@ -65,7 +66,8 @@ int main(int argc, char** argv) {
 
     HN::CNotificationStore     store;
     HN::CNotificationsService  service(*bus, store);
-    HN::CPopupManager          popups(g_backend, store);
+    HN::CInboxService          inbox(*bus, store, service);
+    HN::CPopupManager          popups(g_backend, store, service);
 
     // Drive sdbus's event loop from inside hyprtoolkit's. sdbus exposes a
     // single fd we can poll; on read-ready we drain pending requests. The

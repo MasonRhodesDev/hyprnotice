@@ -90,12 +90,9 @@ namespace HN {
         return {"body", "persistence"};
     }
 
-    sdbus::Struct<std::string, std::string, std::string, std::string>
+    std::tuple<std::string, std::string, std::string, std::string>
     CNotificationsService::onGetServerInformation() {
-        return sdbus::Struct{std::string{"hyprnotice"},
-                             std::string{"hyprwm-community"},
-                             std::string{HYPRNOTICE_VERSION},
-                             std::string{"1.2"}};
+        return {"hyprnotice", "hyprwm-community", HYPRNOTICE_VERSION, "1.2"};
     }
 
 }

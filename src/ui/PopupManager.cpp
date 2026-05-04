@@ -5,8 +5,8 @@
 
 namespace HN {
 
-    CPopupManager::CPopupManager(SP<Hyprtoolkit::IBackend> backend, CNotificationStore& store)
-        : m_backend(backend), m_store(store) {
+    CPopupManager::CPopupManager(SP<Hyprtoolkit::IBackend> backend, CNotificationStore& store, CNotificationsService& notif)
+        : m_backend(backend), m_store(store), m_notif(notif) {
 
         m_addedListener   = m_store.m_events.added.listen(
             [this](SP<SNotification> n) { onAdded(n); });
@@ -20,7 +20,7 @@ namespace HN {
 
     void CPopupManager::onAdded(SP<SNotification> n) {
         Debug::log(Debug::TRACE, "popup-mgr: spawning popup for id={}", n->id);
-        m_popups.emplace(n->id, makeUnique<CPopupWindow>(m_backend, n, m_store));
+        m_popups.emplace(n->id, makeUnique<CPopupWindow>(m_backend, n, m_store, m_notif));
     }
 
     void CPopupManager::onUpdated(SP<SNotification> n) {
@@ -29,7 +29,7 @@ namespace HN {
             // Was previously demoted to INBOX (no popup) — bring it back
             // visible only if its state requires it.
             if (n->state == SNotification::eState::VISIBLE) {
-                m_popups.emplace(n->id, makeUnique<CPopupWindow>(m_backend, n, m_store));
+                m_popups.emplace(n->id, makeUnique<CPopupWindow>(m_backend, n, m_store, m_notif));
             }
             return;
         }

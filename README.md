@@ -15,25 +15,24 @@ Notification daemon for Hyprland with an action-retaining inbox.
 - Not a control center. The inbox is exposed via a CLI/IPC; an external picker (wofi/fuzzel) renders it.
 - Not feature-complete. See the roadmap below.
 
-## Status: v0.2.0 — popups render
+## Status: v0.3.0 — action retention, inbox, CLI
 
 What works:
-- D-Bus server registers `org.freedesktop.Notifications` on the user session bus
-- Implements `Notify`, `CloseNotification`, `GetCapabilities`, `GetServerInformation`
-- Notifications stored in `CNotificationStore`; emits `NotificationClosed` on close
-- **Layer-shell popups rendered via hyprtoolkit** (top-right, OVERLAY layer, no kbd focus)
-- Popup auto-closes via configurable timeout (default 5s, `expire_timeout=0` keeps it persistent)
-- **Auto-close demotes to INBOX, doesn't emit NotificationClosed** — sender's action handlers stay alive for the inbox UI to invoke later
+- Full `org.freedesktop.Notifications` D-Bus server (Notify / CloseNotification / GetCapabilities / GetServerInformation)
+- **`notify-send` works** — reply signature fix in v0.3 (was emitting `(ssss)` struct-wrapped, libnotify wanted plain `ssss`)
+- **Layer-shell popups** via hyprtoolkit (top-right, OVERLAY, no kbd focus, auto-sized to content)
+- **Action buttons** in popups — click invokes the action's D-Bus signal and closes the popup
+- **Action retention via inbox state** — popup auto-close demotes (not closes), so the source app's action handlers stay alive. You can invoke a Slack notification's "Reply" from the inbox an hour after the popup vanished.
+- **`org.hyprnotice.Inbox`** custom D-Bus interface for inbox introspection (List / Invoke / Dismiss / DismissAll + `Changed` signal)
+- **`hyprnotice-ctl`** CLI: `list`, `invoke <id> [action]`, `dismiss <id>`, `dismiss-all`
 - sdbus-c++ event loop integrated into hyprtoolkit's via `addFd`
-- `--version`, `--help`, `--verbose`, `--quiet` flags
 
 What does NOT work yet:
-- No icon rendering (popups are text-only summary + body)
-- No action buttons in popups
-- No inbox picker / `hyprnotice-ctl` CLI
+- No icon rendering (popups are text + buttons, no icon area)
+- No body-click → default action (only explicit buttons trigger actions)
 - No hyprlang config (layout, default-timeout, anchor, per-app rules)
 - No lmtt theming integration (uses hyprtoolkit's default palette)
-- No `ActionInvoked` wiring beyond the signal definition
+- No DND mode, no per-app rules, no urgency-based styling
 
 ## Roadmap
 
@@ -41,8 +40,8 @@ What does NOT work yet:
 |---|---|
 | **v0.1** ✓ | D-Bus skeleton, store, build/lint/test scaffolding |
 | **v0.2** ✓ | Popup rendering via hyprtoolkit layer-shell window. Auto-close demotes to inbox. |
-| **v0.3** | Action buttons in popups. Icons. `hyprnotice-ctl` CLI for inbox listing/dismissal/action invocation. |
-| **v0.4** | `hyprlang` config for layout/timeouts/per-app rules. lmtt module + matugen template. |
+| **v0.3** ✓ | Action buttons in popups. `hyprnotice-ctl` CLI for inbox listing/dismissal/action invocation. notify-send fix. |
+| **v0.4** | Icons (path + freedesktop icon-theme lookup). Body-click default action. `hyprlang` config (layout/timeouts/per-app rules). lmtt module + matugen template. |
 | **v0.5** | Persistent history (write to `$XDG_RUNTIME_DIR` so survives daemon restart but not reboot). DND mode. Per-monitor placement. |
 | **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. |
 
@@ -72,5 +71,22 @@ systemctl --user stop mako.service swaync.service 2>/dev/null
 Test from another terminal:
 
 ```sh
-notify-send "hyprnotice test" "if this prints to stderr above, the D-Bus server is alive"
+notify-send "hyprnotice test" "popup at top-right"
+hyprnotice-ctl list
+hyprnotice-ctl dismiss-all
 ```
+
+Send a notification with action buttons:
+
+```sh
+gdbus call --session \
+  --dest org.freedesktop.Notifications \
+  --object-path /org/freedesktop/Notifications \
+  --method org.freedesktop.Notifications.Notify \
+  '"app"' 'uint32 0' '""' '"summary"' '"body"' \
+  '["reply", "Reply", "mark-read", "Mark Read"]' \
+  '@a{sv} {}' 'int32 0'
+```
+
+Persistent (`expire_timeout=0`) so the popup stays until you click a button or
+dismiss via `hyprnotice-ctl dismiss <id>`.

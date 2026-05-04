@@ -12,6 +12,7 @@
 namespace HN {
 
     class CNotificationStore;
+    class CNotificationsService;
 
     // One layer-shell popup window per VISIBLE notification. The window
     // auto-closes after the notification's expireTimeoutMs (or a daemon
@@ -24,7 +25,8 @@ namespace HN {
       public:
         CPopupWindow(SP<Hyprtoolkit::IBackend> backend,
                      SP<SNotification>         notification,
-                     CNotificationStore&       store);
+                     CNotificationStore&       store,
+                     CNotificationsService&    notif);
         ~CPopupWindow();
 
         uint32_t id() const { return m_id; }
@@ -42,6 +44,7 @@ namespace HN {
         SP<Hyprtoolkit::IBackend>           m_backend;
         SP<SNotification>                   m_notif;
         CNotificationStore&                 m_store;
+        CNotificationsService&              m_notifService;
         uint32_t                            m_id = 0;
 
         SP<Hyprtoolkit::IWindow>            m_window;
