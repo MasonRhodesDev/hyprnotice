@@ -37,6 +37,13 @@ namespace HN {
         // iteration is safe across UI updates.
         std::vector<SP<SNotification>> snapshot() const;
 
+        // Do-not-disturb mode. When true, accept() still records the
+        // notification (it shows up in the inbox CLI as usual) but the popup
+        // manager skips the on-screen popup. Toggled via the inbox D-Bus
+        // SetMode method or `hyprnotice-ctl mode`.
+        bool dnd() const { return m_dnd; }
+        void setDnd(bool v);
+
         struct {
             // (id, reason) — emit NotificationClosed on D-Bus from the server.
             Hyprutils::Signal::CSignalT<uint32_t, SNotification::eCloseReason> closed;
@@ -44,11 +51,16 @@ namespace HN {
             // (notification) — UI subscribers redraw the popup queue & inbox.
             Hyprutils::Signal::CSignalT<SP<SNotification>>                     added;
             Hyprutils::Signal::CSignalT<SP<SNotification>>                     updated;
+
+            // (newDnd) — emitted when DND state flips. Inbox CLI watchers
+            // surface this via the existing Changed signal.
+            Hyprutils::Signal::CSignalT<bool>                                  modeChanged;
         } m_events;
 
       private:
         uint32_t                                          m_nextId = 1;
         std::unordered_map<uint32_t, SP<SNotification>>   m_byId;
+        bool                                              m_dnd    = false;
     };
 
 }

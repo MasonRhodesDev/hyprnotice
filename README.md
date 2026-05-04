@@ -15,7 +15,7 @@ Notification daemon for Hyprland with an action-retaining inbox.
 - Not a control center. The inbox is exposed via a CLI/IPC; an external picker (wofi/fuzzel) renders it.
 - Not feature-complete. See the roadmap below.
 
-## Status: v0.5.0 — hyprlang config
+## Status: v0.6.0 — icons, DND mode
 
 What works:
 - Full `org.freedesktop.Notifications` D-Bus server (Notify / CloseNotification / GetCapabilities / GetServerInformation)
@@ -28,13 +28,16 @@ What works:
 - **lmtt theming** — popups read `~/.config/matugen/lmtt-colors.css` directly. SIGHUP triggers a re-read; an lmtt module sends the SIGHUP after every theme switch.
 - **hyprlang config** at `~/.config/hypr/hyprnotice.conf` for popup geometry (anchor, layer, width, height, margins) and timing (default_timeout). Reloaded on SIGHUP. See `assets/example.conf`.
 - **All actions render as buttons**, including the spec's `default` action — clicking the labeled button invokes its handler over D-Bus and dismisses.
+- **Icons** in popups: `app_icon` strings are resolved as freedesktop icon names (via hyprtoolkit's `systemIcons()` icon-theme lookup), with a fall-through to absolute paths and `file://` URIs. Skipped when no icon is provided.
+- **Do-not-disturb mode**: `hyprnotice-ctl mode dnd|none|toggle`. Notifications still arrive and appear in `hyprnotice-ctl list`/the inbox picker — only the popup is suppressed. Same D-Bus methods on `org.hyprnotice.Inbox` (`SetMode`, `GetMode`).
 - **`install.sh`** — symlinks binaries into `/usr/local/bin`, drops a systemd user unit, disables predecessor mako D-Bus activation
 - sdbus-c++ event loop integrated into hyprtoolkit's via `addFd`
 
 What does NOT work yet:
-- No icon rendering (popups are text + buttons, no icon area)
 - No body-click → default action (hyprtoolkit's IElement doesn't expose click handlers on Rectangle/Layout; "default" actions still appear as a button so the action can be invoked)
-- No per-app rules, no DND mode, no urgency-based styling
+- No per-app rules
+- No urgency-based styling
+- `icon_data` hint (raw image bytes embedded in notifications) is ignored — only `app_icon` (path or freedesktop name) is honored
 
 ## Roadmap
 
@@ -45,8 +48,9 @@ What does NOT work yet:
 | **v0.3** ✓ | Action buttons in popups. `hyprnotice-ctl` CLI for inbox listing/dismissal/action invocation. notify-send fix. |
 | **v0.4** ✓ | lmtt theming via direct lmtt-colors.css read + SIGHUP reload. Install script + systemd unit. mako migration. |
 | **v0.5** ✓ | hyprlang config for popup geometry/timing. "default" action rendered as button. |
-| **v0.6** | Icons (path + freedesktop icon-theme lookup). DND mode. Per-app rules (special category). Body-click on popup background. |
-| **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. Persistent history across daemon restarts. |
+| **v0.6** ✓ | Icons (path + freedesktop icon-theme lookup). DND mode. |
+| **v0.7** | Per-app rules (hyprlang special category). Urgency-based styling. icon_data hint. |
+| **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, persistent history across daemon restarts. |
 | **v1.0** | Feature-parity with swaync inbox: replies, grouping, sound, urgency-based styling. |
 
 ## Building

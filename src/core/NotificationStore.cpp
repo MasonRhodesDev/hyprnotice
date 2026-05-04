@@ -55,6 +55,14 @@ namespace HN {
         return it != m_byId.end() ? it->second : SP<SNotification>{};
     }
 
+    void CNotificationStore::setDnd(bool v) {
+        if (m_dnd == v)
+            return;
+        m_dnd = v;
+        Debug::log(Debug::INFO, "store: dnd={}", v ? "on" : "off");
+        m_events.modeChanged.emit(v);
+    }
+
     std::vector<SP<SNotification>> CNotificationStore::snapshot() const {
         std::vector<SP<SNotification>> out;
         out.reserve(m_byId.size());

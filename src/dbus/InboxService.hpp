@@ -41,6 +41,11 @@ namespace HN {
         // DismissAll() — close all entries.
         void onDismissAll();
 
+        // SetMode(s) where s is "none" | "dnd" | "toggle".
+        void        onSetMode(const std::string& mode);
+        // GetMode() -> "none" | "dnd"
+        std::string onGetMode();
+
         sdbus::IConnection&             m_bus;
         CNotificationStore&             m_store;
         CNotificationsService&          m_notif;

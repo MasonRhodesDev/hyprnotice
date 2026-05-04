@@ -25,7 +25,9 @@ namespace {
             "  invoke <id> [action_key]   Invoke an action on the notification\n"
             "                             (default: \"default\")\n"
             "  dismiss <id>               Close a single notification\n"
-            "  dismiss-all                Close every notification");
+            "  dismiss-all                Close every notification\n"
+            "  mode                       Print current mode (none|dnd)\n"
+            "  mode <none|dnd|toggle>     Set DND mode");
     }
 
     int doList(sdbus::IProxy& proxy) {
@@ -63,6 +65,20 @@ namespace {
         proxy.callMethod("DismissAll").onInterface(kInterface);
         return 0;
     }
+
+    int doMode(sdbus::IProxy& proxy, const std::string& arg) {
+        if (arg.empty()) {
+            std::string m;
+            proxy.callMethod("GetMode").onInterface(kInterface).storeResultsTo(m);
+            std::println("{}", m);
+            return 0;
+        }
+        proxy.callMethod("SetMode").onInterface(kInterface).withArguments(arg);
+        std::string m;
+        proxy.callMethod("GetMode").onInterface(kInterface).storeResultsTo(m);
+        std::println("{}", m);
+        return 0;
+    }
 }
 
 int main(int argc, char** argv) {
@@ -95,6 +111,9 @@ int main(int argc, char** argv) {
             const auto        id  = static_cast<uint32_t>(std::stoul(argv[2]));
             const std::string key = argc > 3 ? argv[3] : "default";
             return doInvoke(*proxy, id, key);
+        }
+        if (cmd == "mode") {
+            return doMode(*proxy, argc > 2 ? argv[2] : "");
         }
     } catch (const sdbus::Error& e) {
         std::println(stderr, "D-Bus error: {}: {}", e.getName().c_str(), e.getMessage());

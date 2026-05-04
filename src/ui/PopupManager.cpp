@@ -19,6 +19,15 @@ namespace HN {
     CPopupManager::~CPopupManager() = default;
 
     void CPopupManager::onAdded(SP<SNotification> n) {
+        // DND silences popups but keeps the notification in the store so it
+        // shows up in `hyprnotice-ctl list` and the inbox picker. We mark the
+        // state as INBOX up-front so the CLI doesn't lie about whether the
+        // popup is on screen.
+        if (m_store.dnd()) {
+            Debug::log(Debug::TRACE, "popup-mgr: dnd active — id={} suppressed (inbox)", n->id);
+            m_store.demote(n->id);
+            return;
+        }
         Debug::log(Debug::TRACE, "popup-mgr: spawning popup for id={}", n->id);
         m_popups.emplace(n->id, makeUnique<CPopupWindow>(m_backend, n, m_store, m_notif));
     }

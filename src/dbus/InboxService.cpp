@@ -22,6 +22,10 @@ namespace HN {
                 [this](uint32_t id) { onDismiss(id); }),
             sdbus::registerMethod("DismissAll").implementedAs(
                 [this] { onDismissAll(); }),
+            sdbus::registerMethod("SetMode").implementedAs(
+                [this](const std::string& m) { onSetMode(m); }),
+            sdbus::registerMethod("GetMode").implementedAs(
+                [this] { return onGetMode(); }),
             sdbus::registerSignal("Changed").withParameters<>()
         ).forInterface(sdbus::InterfaceName{kInterface});
 
@@ -72,6 +76,21 @@ namespace HN {
         Debug::log(Debug::INFO, "inbox: dismiss-all ({} entries)", snap.size());
         for (const auto& n : snap)
             m_store.close(n->id, SNotification::eCloseReason::DISMISSED);
+    }
+
+    void CInboxService::onSetMode(const std::string& mode) {
+        if (mode == "toggle")
+            m_store.setDnd(!m_store.dnd());
+        else if (mode == "dnd")
+            m_store.setDnd(true);
+        else if (mode == "none" || mode == "off")
+            m_store.setDnd(false);
+        else
+            Debug::log(Debug::WARN, "inbox: unknown mode \"{}\"; expected none|dnd|toggle", mode);
+    }
+
+    std::string CInboxService::onGetMode() {
+        return m_store.dnd() ? "dnd" : "none";
     }
 
 }

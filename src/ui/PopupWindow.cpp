@@ -1,11 +1,15 @@
 #include "PopupWindow.hpp"
 
+#include <filesystem>
+
 #include <hyprtoolkit/core/Timer.hpp>
 #include <hyprtoolkit/element/Button.hpp>
 #include <hyprtoolkit/element/ColumnLayout.hpp>
+#include <hyprtoolkit/element/Image.hpp>
 #include <hyprtoolkit/element/Rectangle.hpp>
 #include <hyprtoolkit/element/RowLayout.hpp>
 #include <hyprtoolkit/element/Text.hpp>
+#include <hyprtoolkit/system/Icons.hpp>
 #include <hyprtoolkit/types/FontTypes.hpp>
 #include <hyprutils/memory/Atomic.hpp>
 
@@ -83,11 +87,45 @@ namespace HN {
                 ->rounding(10)
                 ->commence());
 
+        // Top-level row: [icon] [text column]. If no icon was provided we
+        // skip the icon child and let the column expand to full width.
+        auto row = CRowLayoutBuilder::begin()
+                       ->gap(10)
+                       ->size({CDynamicSize::HT_SIZE_PERCENT, CDynamicSize::HT_SIZE_AUTO, {1.F, 1.F}})
+                       ->commence();
+        m_window->m_rootElement->addChild(row);
+
+        if (!m_notif->appIcon.empty()) {
+            constexpr Hyprutils::Math::Vector2D kIconSize{48, 48};
+            const auto& icon = m_notif->appIcon;
+            // Heuristic: leading "/" or "file://" → absolute path; otherwise
+            // freedesktop icon name (resolved via hyprtoolkit's systemIcons
+            // factory which walks the user's icon-theme search path).
+            SP<CImageElement> img;
+            if (icon.starts_with("/") || icon.starts_with("file://")) {
+                std::string path = icon.starts_with("file://") ? icon.substr(7) : icon;
+                if (std::filesystem::exists(path)) {
+                    img = CImageBuilder::begin()
+                              ->path(std::move(path))
+                              ->size({CDynamicSize::HT_SIZE_ABSOLUTE, CDynamicSize::HT_SIZE_ABSOLUTE, kIconSize})
+                              ->rounding(6)
+                              ->commence();
+                }
+            } else if (auto desc = m_backend->systemIcons()->lookupIcon(icon)) {
+                img = CImageBuilder::begin()
+                          ->icon(desc)
+                          ->size({CDynamicSize::HT_SIZE_ABSOLUTE, CDynamicSize::HT_SIZE_ABSOLUTE, kIconSize})
+                          ->commence();
+            }
+            if (img)
+                row->addChild(img);
+        }
+
         auto col = CColumnLayoutBuilder::begin()
                        ->gap(6)
                        ->size({CDynamicSize::HT_SIZE_PERCENT, CDynamicSize::HT_SIZE_AUTO, {1.F, 1.F}})
                        ->commence();
-        m_window->m_rootElement->addChild(col);
+        row->addChild(col);
 
         auto title = CTextBuilder::begin()
                          ->text(std::format("{}: {}",
